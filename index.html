@@ -463,7 +463,7 @@ const DEFAULTS={style:'photo',season:1,set:'meadow',palette:'natural',density:.5
 let P=JSON.parse(JSON.stringify(DEFAULTS));
 let strokes=[],nextId=1,history=[],redoStack=[],plants=[],tool='draw',selection=null,drawing=null,marquee=null,isExample=false,drag=null,hoverId=null,spaceDown=false;
 const view={s:1,x:0,y:0};
-const scaleF=()=>0.5*Math.pow(4,P.scale);
+const scaleF=()=>P.scale<=0.5?0.5*Math.pow(4,P.scale):Math.pow(4,(P.scale-0.5)*2); // ×0.5 … ×1 (middle) … ×4
 const growDur=st=>clamp(st.len*0.9,700,2200);
 
 /* ---------- path processing ---------- */
