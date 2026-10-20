@@ -1,4 +1,4 @@
-# Growline
+<img src="sprites/logo-light.webp" alt="Growline" width="490">
 
 A procedural botanical drawing tool. Draw a path and flowers, grasses, leaves and stems grow along it.
 
