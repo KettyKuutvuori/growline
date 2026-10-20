@@ -54,7 +54,7 @@ kbd{font-family:var(--f-mono);font-size:10px;opacity:.6}
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .topbar{grid-column:1/3;grid-row:1;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--rule);padding-right:16px;min-width:0}
 .mark{margin:0;padding:0 4px;line-height:0;user-select:none;flex:none}
-.logo{height:48px;width:auto;display:block;-webkit-user-drag:none}
+.logo{height:42px;width:auto;display:block;-webkit-user-drag:none}
 .logo-d{display:none}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo-l{display:none}:root:not([data-theme="light"]) .logo-d{display:block}}
 :root[data-theme="dark"] .logo-l{display:none}:root[data-theme="dark"] .logo-d{display:block}
@@ -205,7 +205,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{border-color:var(--accent)
 
 <div class="app">
   <header class="topbar">
-    <h1 class="mark"><img class="logo logo-l" src="sprites/logo-light.webp" alt="Growline" width="245" height="48"><img class="logo logo-d" src="sprites/logo-dark.webp" alt="" aria-hidden="true" width="245" height="48"></h1>
+    <h1 class="mark"><img class="logo logo-l" src="sprites/logo-light.webp" alt="Growline" width="491" height="96"><img class="logo logo-d" src="sprites/logo-dark.webp" alt="" aria-hidden="true" width="491" height="96"></h1>
     <div class="tb-spacer"></div>
     <button class="tb-btn" id="b-play" type="button" title="Play the growth from the start (G)" aria-label="Play growth animation"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path class="ic-play" d="M8 5.8v12.4a.6.6 0 0 0 .9.5l10-6.2a.6.6 0 0 0 0-1L8.9 5.3a.6.6 0 0 0-.9.5z"/><rect class="ic-stop" x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg><span>Play</span></button>
     <button class="tb-btn" id="b-img" type="button" title="Upload an image to draw over (or drop / paste one)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M3.5 16l5-4.5 4 3.5 3-2.5 5 4"/><circle cx="15.5" cy="9.5" r="1.4"/></svg><span>Upload</span></button>
@@ -232,6 +232,11 @@ input[type=range]:focus-visible::-webkit-slider-thumb{border-color:var(--accent)
     <div class="empty" id="empty" hidden>
       <h2>Draw a line.<br>Let it grow.</h2>
       <p>Closed shapes become wreaths</p>
+    </div>
+    <div class="selbar imgbar" id="imgbar" hidden>
+      <span>Image</span>
+      <button id="b-img-fit" type="button" title="Fit the image to the view">Fit</button>
+      <button id="b-img-del" type="button" title="Delete image (Delete)">Delete <kbd>⌫</kbd></button>
     </div>
     <div class="selbar" id="selbar" hidden>
       <span id="selinfo">Section</span>
@@ -1775,6 +1780,9 @@ function render(now){
   }
   const hv=(editing&&(drag&&drag.st?drag.st.id:hoverId));
   if(hv!=null){const st=strokes.find(s=>s.id===hv);if(st){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=accent;ctx.globalAlpha=.25;ctx.lineWidth=8*px;strokePath(ctx,st.pts,-1,1e9);ctx.stroke();ctx.globalAlpha=1;ctx.lineWidth=1.5*px;ctx.stroke();ctx.restore()}}
+  if(imgSel&&underlay){const r=underlay.rect,hs=9*px;ctx.save();ctx.strokeStyle=accent;ctx.lineWidth=1.5*px;ctx.strokeRect(r.x,r.y,r.w,r.h);
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--panel').trim()||'#fff';ctx.lineWidth=1.25*px;
+    for(const[cx,cy]of imgCorners()){ctx.fillRect(cx-hs/2,cy-hs/2,hs,hs);ctx.strokeRect(cx-hs/2,cy-hs/2,hs,hs)}ctx.restore()}
   if(selection){
     ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=7*px;ctx.strokeStyle=accent;ctx.globalAlpha=0.32;
     for(const sl of selection){const st=strokes.find(s=>s.id===sl.id);if(!st)continue;strokePath(ctx,st.pts,sl.s0,sl.s1);ctx.stroke()}
@@ -1828,9 +1836,9 @@ function syncUI(){
 }
 function hint(){
   let h;
-  if(tool==='select')h='<b>Select</b> · drag across part of a path, or click on it. Then regrow or prune just that section.';
+  if(tool==='select')h='<b>Select</b> · drag across part of a path, or click on it, to regrow or prune that section. Click the image to select it.';
   else if(tool==='reshape')h='<b>Reshape</b> · drag any part of a path to bend it. The plants regrow along the new curve.';
-  else if(tool==='move')h='<b>Move</b> · drag a path to move it, or drag empty canvas to pan. Hold Space to pan with any tool.';
+  else if(tool==='move')h='<b>Move</b> · drag a path or the image to move it, drag image corners to resize, ⌫ deletes the image. Drag empty canvas or hold Space to pan.';
   else if(underlay&&!strokes.length)h='<b>Draw over your image</b> · trace an edge, a horizon or a shape and plants grow along it.';
   else if(isExample)h='<b>Example paths.</b> Draw anywhere to add your own, upload an image to draw over, or Clear to start fresh.';
   else h='<b>Draw</b> · a line or closed shape · <kbd>V</kbd> select · <kbd>C</kbd> reshape · <kbd>H</kbd> move';
@@ -1849,7 +1857,7 @@ $('#k-guide').addEventListener('change',e=>{P.guide=e.target.checked;req();save(
 $('#k-vine').addEventListener('change',e=>{P.vine=e.target.checked;req();save()});
 for(const[k,id]of[['f','#c-f'],['b','#c-b'],['a','#c-a']])$(id).addEventListener('input',e=>{P.custom[k]=e.target.value;req();save()});
 $$('.swatches button').forEach(b=>b.addEventListener('click',()=>{P.bg=b.dataset.bg;syncUI();req();save()}));
-function setTool(t){tool=t;hoverId=null;if(t!=='select'){selection=null;positionSelbar()}syncUI();req()}
+function setTool(t){tool=t;hoverId=null;if(t!=='select'&&t!=='move')setImgSel(false);cv.style.cursor='';if(t!=='select'){selection=null;positionSelbar()}syncUI();req()}
 for(const t of['draw','select','reshape','move'])$('#t-'+t).addEventListener('click',()=>setTool(t));
 $('#b-undo').addEventListener('click',undo);$('#b-redo').addEventListener('click',redo);
 $('#b-clear').addEventListener('click',()=>{if(!strokes.length)return;record({t:'clear',strokes:strokes.slice(),wasExample:isExample});strokes=[];selection=null;isExample=false;syncUI();changed();toast('Canvas cleared · ⌘Z brings it back')});
@@ -1879,6 +1887,12 @@ let regrowPending=false;
 function scheduleRegrow(){if(regrowPending)return;regrowPending=true;requestAnimationFrame(()=>{regrowPending=false;regenerate();stats();positionSelbar();req()})}
 cv.addEventListener('pointerdown',e=>{
   const p=pos(e);
+  if(e.button===0&&!spaceDown&&underlay&&(tool==='move'||tool==='select')){
+    const hd=imgSel?imgHandle(p):-1,nearPath=hitStroke(p,12/view.s);
+    if(hd>=0){cv.setPointerCapture(e.pointerId);drag={mode:'ulsize',corner:hd,before:{...underlay.rect},last:p};req();return}
+    if(!nearPath&&inImg(p)&&(tool==='move'||imgSel)){cv.setPointerCapture(e.pointerId);setImgSel(true);drag={mode:'ulmove',before:{...underlay.rect},last:p};req();return}
+  }
+  if(e.button===0&&imgSel)setImgSel(false);
   const wantPan=e.button===1||spaceDown||(e.button===0&&tool==='move'&&!hitStroke(p,12/view.s));
   if(wantPan){cv.setPointerCapture(e.pointerId);drag={mode:'pan',sx:e.clientX,sy:e.clientY,vx:view.x,vy:view.y};stage.classList.add('panning');e.preventDefault();return}
   if(e.button!==0)return;cv.setPointerCapture(e.pointerId);
@@ -1897,6 +1911,8 @@ cv.addEventListener('pointermove',e=>{
   if(drag){
     if(drag.mode==='pan'){view.x=drag.vx+(e.clientX-drag.sx);view.y=drag.vy+(e.clientY-drag.sy);positionSelbar();req();return}
     const p=pos(e),dx=p.x-drag.last.x,dy=p.y-drag.last.y;drag.last=p;
+    if(drag.mode==='ulmove'){underlay.rect.x+=dx;underlay.rect.y+=dy;positionImgbar();req();return}
+    if(drag.mode==='ulsize'){resizeImg(drag,p);positionImgbar();req();return}
     if(drag.mode==='move'){translateStroke(drag.st,dx,dy);drag.dx+=dx;drag.dy+=dy;scheduleRegrow();return}
     if(drag.mode==='reshape'){const a0=drag.arc[drag.idx];
       drag.src.forEach((q,i)=>{let d=Math.abs(drag.arc[i]-a0);if(drag.closed)d=Math.min(d,drag.L-d);const w=Math.exp(-((d/drag.R)**2));q.x+=dx*w;q.y+=dy*w});
@@ -1905,9 +1921,11 @@ cv.addEventListener('pointermove',e=>{
   if(drawing){const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];for(const ev of(evs.length?evs:[e])){const p=pos(ev);if(dist(p,drawing[drawing.length-1])>1.5/view.s)drawing.push(p)}req()}
   else if(marquee){const p=pos(e);marquee.x1=p.x;marquee.y1=p.y;req()}
   else if(tool==='reshape'||tool==='move'){const st=hitStroke(pos(e),(tool==='move'?12:16)/view.s),id=st?st.id:null;if(id!==hoverId){hoverId=id;req()}}
+  if(!drag&&!drawing&&!marquee)imgCursor(pos(e));
 });
 function endPointer(){
   if(drag){const d=drag;drag=null;stage.classList.remove('panning');
+    if((d.mode==='ulmove'||d.mode==='ulsize')&&underlay){const r=underlay.rect,b=d.before;if(r.x!==b.x||r.y!==b.y||r.w!==b.w){record({t:'ulrect',before:b,after:{...r}});saveImg()}}
     if(d.mode==='move'&&d.st&&(d.dx||d.dy)){record({t:'move',id:d.st.id,dx:d.dx,dy:d.dy});changed()}
     if(d.mode==='reshape'){const st=strokes.find(s=>s.id===d.id);if(st&&d.src.some((q,i)=>q.x!==d.before[i].x||q.y!==d.before[i].y)){record({t:'reshape',id:d.id,before:d.before,after:d.src.map(q=>({x:q.x,y:q.y}))});changed()}}
     req();return}
@@ -1923,6 +1941,7 @@ function endPointer(){
     const m=marquee;marquee=null;
     const small=Math.abs(m.x1-m.x0)<6/view.s&&Math.abs(m.y1-m.y0)<6/view.s;
     selection=small?pickNear(m.x0,m.y0):selectRect(Math.min(m.x0,m.x1),Math.min(m.y0,m.y1),Math.max(m.x0,m.x1),Math.max(m.y0,m.y1));
+    if(small&&!selection&&underlay&&inImg({x:m.x0,y:m.y0}))setImgSel(true);
     positionSelbar();req();
   }
 }
@@ -1957,6 +1976,7 @@ function pickNear(x,y){
 }
 const selbar=$('#selbar');
 function positionSelbar(){
+  positionImgbar();
   if(!selection){selbar.hidden=true;return}
   let x0=1e9,y0=1e9,x1=-1e9,len=0;
   for(const sl of selection){const st=strokes.find(s=>s.id===sl.id);if(!st)continue;len+=sl.s1-sl.s0;for(const p of st.pts)if(p.s>=sl.s0&&p.s<=sl.s1){x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x)}}
@@ -1985,6 +2005,8 @@ function applyHist(h,dir){
   else if(h.t==='regions'){for(const[sid,reg]of h.list){const st=strokes.find(s=>s.id===sid);if(!st)continue;if(dir<0)st.regions=st.regions.filter(r=>r!==reg);else{reg.bornAt=now;st.regions.push(reg)}}}
   else if(h.t==='move'){const st=strokes.find(s=>s.id===h.id);if(st)translateStroke(st,dir*h.dx,dir*h.dy)}
   else if(h.t==='reshape'){rebuildStroke(h.id,(dir<0?h.before:h.after).map(p=>({x:p.x,y:p.y})))}
+  else if(h.t==='ulrect'){if(underlay)underlay.rect={...(dir<0?h.before:h.after)};saveImg();positionImgbar()}
+  else if(h.t==='ulset'){underlay=dir<0?h.before:h.after;if(!underlay)setImgSel(false);saveImg();syncUI();positionImgbar()}
   else if(h.t==='clear'){if(dir<0){strokes=h.strokes.slice();isExample=h.wasExample}else{strokes=[];isExample=false}}
 }
 function undo(){const h=history.pop();if(!h){toast('Nothing to undo');return}applyHist(h,-1);redoStack.push(h);selection=null;syncHist();changed();hint()}
@@ -2010,8 +2032,10 @@ addEventListener('keydown',e=>{
   else if(e.key==='-')zoomStep(-1);
   else if(e.key==='0')zoomReset();
   else if(k==='r'&&selection)applyRegion('new','Section regrown');
+  else if((e.key==='Backspace'||e.key==='Delete')&&imgSel){e.preventDefault();removeImage()}
+  else if(imgSel&&e.key.startsWith('Arrow')){e.preventDefault();const st=(e.shiftKey?10:1)/view.s,b={...underlay.rect};underlay.rect.x+=e.key==='ArrowLeft'?-st:e.key==='ArrowRight'?st:0;underlay.rect.y+=e.key==='ArrowUp'?-st:e.key==='ArrowDown'?st:0;record({t:'ulrect',before:b,after:{...underlay.rect}});saveImg();positionImgbar();req()}
   else if((e.key==='Backspace'||e.key==='Delete')&&selection){e.preventDefault();applyRegion(-1,'Section pruned')}
-  else if(e.key==='Escape'){selection=null;positionSelbar();req()}
+  else if(e.key==='Escape'){selection=null;setImgSel(false);positionSelbar();req()}
 });
 
 /* ---------- export ---------- */
@@ -2266,6 +2290,26 @@ mp4Btn.addEventListener('click',async()=>{
 
 /* ---------- image underlay ---------- */
 let underlay=null;const IMG_KEY='growline.img.v1';
+/* ---------- image selection: move, resize from corners, delete ---------- */
+let imgSel=false;const imgbar=$('#imgbar');
+function inImg(p){const r=underlay&&underlay.rect;return!!r&&p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h}
+function imgCorners(){const r=underlay.rect;return[[r.x,r.y],[r.x+r.w,r.y],[r.x+r.w,r.y+r.h],[r.x,r.y+r.h]]}
+function imgHandle(p){if(!underlay)return-1;const t=10/view.s;return imgCorners().findIndex(([x,y])=>Math.abs(p.x-x)<=t&&Math.abs(p.y-y)<=t)}
+function resizeImg(d,p){const b=d.before,ar=b.w/b.h,c=d.corner,ax=c===1||c===2?b.x:b.x+b.w,ay=c>=2?b.y:b.y+b.h;
+  let w=Math.max(Math.abs(p.x-ax),Math.abs(p.y-ay)*ar,40/view.s),h=w/ar;
+  underlay.rect={x:c===1||c===2?ax:ax-w,y:c>=2?ay:ay-h,w,h}}
+function setImgSel(on){on=!!(on&&underlay);if(on===imgSel)return;imgSel=on;if(on&&selection){selection=null;positionSelbar()}positionImgbar();req()}
+function positionImgbar(){
+  if(!imgSel||!underlay){imgbar.hidden=true;return}imgbar.hidden=false;const r=underlay.rect,bw=imgbar.offsetWidth,bh=imgbar.offsetHeight;
+  const sx0=r.x*view.s+view.x,sx1=(r.x+r.w)*view.s+view.x,sy0=r.y*view.s+view.y;
+  let left=clamp((sx0+sx1)/2-bw/2,10,W-bw-10),top=sy0-bh-12;if(top<12)top=Math.max(12,sy0+12);
+  imgbar.style.left=left+'px';imgbar.style.top=Math.min(top,H-bh-70)+'px'}
+function imgCursor(p){let c='';if(underlay&&(tool==='move'||tool==='select')&&!spaceDown){const hd=imgSel?imgHandle(p):-1;
+  if(hd>=0)c=hd%2?'nesw-resize':'nwse-resize';else if(inImg(p)&&(tool==='move'||imgSel)&&!hitStroke(p,12/view.s))c='move'}
+  if(cv.style.cursor!==c)cv.style.cursor=c}
+function removeImage(){if(!underlay)return;record({t:'ulset',before:underlay,after:null});underlay=null;setImgSel(false);saveImg();syncUI();stats();req();toast('Image deleted · ⌘Z brings it back')}
+$('#b-img-del').addEventListener('click',removeImage);
+$('#b-img-fit').addEventListener('click',()=>{if(!underlay)return;const b={...underlay.rect};underlay.rect=fitRect(underlay.img.naturalWidth,underlay.img.naturalHeight);record({t:'ulrect',before:b,after:{...underlay.rect}});saveImg();positionImgbar();req()});
 function fitRect(w,h){const v=visRect(),m=24/view.s,s=Math.min((v.w-2*m)/w,(v.h-2*m)/h);return{x:v.x+(v.w-w*s)/2,y:v.y+(v.h-h*s)/2,w:w*s,h:h*s}}
 // a new image is sized as if the view were at 100%, so plant scale relative to the image never depends on the zoom it was added at
 function placeImageRect(w,h){const v=visRect(),cx=v.x+v.w/2,cy=v.y+v.h/2,s=Math.min((W-48)/w,(H-48)/h),rw=w*s,rh=h*s;
@@ -2273,7 +2317,7 @@ function placeImageRect(w,h){const v=visRect(),cx=v.x+v.w/2,cy=v.y+v.h/2,s=Math.
 function setUnderlay(url,rect,announce){
   const img=new Image();
   img.onload=()=>{
-    underlay={img,url,rect:rect||placeImageRect(img.naturalWidth,img.naturalHeight)};
+    setImgSel(false);underlay={img,url,rect:rect||placeImageRect(img.naturalWidth,img.naturalHeight)};
     if(announce){if(isExample){strokes=[];history=[];redoStack=[];isExample=false;selection=null;positionSelbar()}toast('Image added. Draw over it.')}
     syncUI();changed();saveImg();
   };
@@ -2302,7 +2346,7 @@ const fileIn=$('#file-img');
 $('#b-img').addEventListener('click',()=>fileIn.click());
 $('#b-ul-replace').addEventListener('click',()=>fileIn.click());
 fileIn.addEventListener('change',()=>{const f=fileIn.files&&fileIn.files[0];if(f)readImageFile(f);fileIn.value=''});
-$('#b-ul-remove').addEventListener('click',()=>{underlay=null;saveImg();syncUI();stats();req();toast('Image removed')});
+$('#b-ul-remove').addEventListener('click',removeImage);
 $('#r-ul').addEventListener('input',e=>{P.ulOpacity=Number(e.target.value);syncUI();req();save()});
 $('#k-ulx').addEventListener('change',e=>{P.ulExport=e.target.checked;syncUI();save()});
 let dragDepth=0;
