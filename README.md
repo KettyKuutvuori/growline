@@ -10,6 +10,7 @@ A procedural botanical drawing tool. Draw a path and flowers, grasses, leaves an
 - Seasons and botanical sets: Wild meadow, Nordic, Alpine, Japanese
 - Palette, density, scale, variation, orientation and seed
 - Upload an image and draw over it
+- Play the growth animation on the canvas (G), then export it as MP4
 - Export PNG, layered SVG, or the growing animation as MP4
 
 ## Run locally
