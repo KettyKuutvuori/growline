@@ -463,7 +463,7 @@ const DEFAULTS={style:'photo',season:1,set:'meadow',palette:'natural',density:.5
 let P=JSON.parse(JSON.stringify(DEFAULTS));
 let strokes=[],nextId=1,history=[],redoStack=[],plants=[],tool='draw',selection=null,drawing=null,marquee=null,isExample=false,drag=null,hoverId=null,spaceDown=false;
 const view={s:1,x:0,y:0};
-const scaleF=()=>P.scale<=0.5?0.5*Math.pow(4,P.scale):Math.pow(4,(P.scale-0.5)*2); // ×0.5 … ×1 (middle) … ×4
+const scaleF=()=>P.scale<=0.5?0.5*Math.pow(4,P.scale):Math.pow(8,(P.scale-0.5)*2); // ×0.5 … ×1 (middle) … ×8
 const growDur=st=>clamp(st.len*0.9,700,2200);
 
 /* ---------- path processing ---------- */
@@ -2259,10 +2259,13 @@ mp4Btn.addEventListener('click',async()=>{
 /* ---------- image underlay ---------- */
 let underlay=null;const IMG_KEY='growline.img.v1';
 function fitRect(w,h){const v=visRect(),m=24/view.s,s=Math.min((v.w-2*m)/w,(v.h-2*m)/h);return{x:v.x+(v.w-w*s)/2,y:v.y+(v.h-h*s)/2,w:w*s,h:h*s}}
+// a new image is sized as if the view were at 100%, so plant scale relative to the image never depends on the zoom it was added at
+function placeImageRect(w,h){const v=visRect(),cx=v.x+v.w/2,cy=v.y+v.h/2,s=Math.min((W-48)/w,(H-48)/h),rw=w*s,rh=h*s;
+  view.s=1;view.x=W/2-cx;view.y=H/2-cy;$('#z-val').textContent='100%';positionSelbar();return{x:cx-rw/2,y:cy-rh/2,w:rw,h:rh}}
 function setUnderlay(url,rect,announce){
   const img=new Image();
   img.onload=()=>{
-    underlay={img,url,rect:rect||fitRect(img.naturalWidth,img.naturalHeight)};
+    underlay={img,url,rect:rect||placeImageRect(img.naturalWidth,img.naturalHeight)};
     if(announce){if(isExample){strokes=[];history=[];redoStack=[];isExample=false;selection=null;positionSelbar()}toast('Image added. Draw over it.')}
     syncUI();changed();saveImg();
   };
