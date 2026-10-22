@@ -348,6 +348,13 @@ input[type=range]:focus-visible::-webkit-slider-thumb{border-color:var(--accent)
         <button type="button" data-v="follow"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16c3-6 5 2 8-3s5-5 10-4"/></svg>Follow path</button><button type="button" data-v="up"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg>Upward</button><button type="button" data-v="radiate"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M5.6 18.4l3.6-3.6M14.8 9.2l3.6-3.6"/></svg>Radiate</button>
       </div>
     </section>
+    <section class="sec" id="sec-wind">
+      <div class="lbl">Wind <span class="val" id="wind-val">Still</span></div>
+      <div class="seg icons" id="seg-wind">
+        <button type="button" data-v="still" title="No wind"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>Still</button><button type="button" data-v="breeze" title="Plants sway in a gentle breeze (W)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9c3-2 5 2 8 0s5-2 7 0M3 15c3-2 5 2 8 0s5-2 7 0"/></svg>Breeze</button><button type="button" data-v="gust" title="A strong gust blows the flowers off the canvas (Shift W)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8"/></svg>Strong</button>
+      </div>
+      <p class="note" id="wind-note">Breeze sways the plants. Strong blows the flowers off the canvas; press Play to grow them back.</p>
+    </section>
     <section class="sec" id="sec-ul" hidden>
       <div class="lbl">Image underlay <span class="val" id="ul-info"></span></div>
       <div class="field">
@@ -484,7 +491,7 @@ const DRIED=new Set(['umbel','spike','pompom']);
 const SEEDY=new Set(['daisy','cup','star5','gentian','bell','umbel','spike','pompom','bCup','bRose','bUmbel','bCloud','bTulip','bDaisy','bBells','bPuff','bSpike','bSun']);
 
 /* ---------- state ---------- */
-const DEFAULTS={style:'photo',season:1,set:'meadow',palette:'natural',density:.55,scale:.5,variation:.45,orient:'follow',seed:4127,locked:false,guide:true,vine:false,custom:{f:'#4f6b3a',b:'#e8a33a',a:'#b8361f'},exs:2,bg:'paper',ulOpacity:1,ulExport:true};
+const DEFAULTS={style:'photo',season:1,set:'meadow',palette:'natural',density:.55,scale:.5,variation:.45,orient:'follow',seed:4127,locked:false,guide:true,vine:false,custom:{f:'#4f6b3a',b:'#e8a33a',a:'#b8361f'},exs:2,bg:'paper',ulOpacity:1,ulExport:true,wind:'still'};
 let P=JSON.parse(JSON.stringify(DEFAULTS));
 let strokes=[],nextId=1,history=[],redoStack=[],plants=[],tool='draw',selection=null,drawing=null,marquee=null,isExample=false,drag=null,hoverId=null,spaceDown=false;
 const view={s:1,x:0,y:0};
@@ -542,6 +549,7 @@ function buildStroke(src,id){
 
 /* ---------- growth ---------- */
 function regenerate(){
+  gust=null;
   plants=[];const heads=[];
   const brush=P.style==='minimal',set=brush?SETS.minimal:SETS[P.set],season=P.season,sf=scaleF(),bias=brush?(BRUSH_BIAS[P.set]||{}):{};
   const wOf=k=>{const b=bias[k]??1;return SP[k].w[season]*(b>1?b*1.5:b*0.55)};
@@ -1753,6 +1761,33 @@ function drawStitched(g,now,final,ox,oy,w,h,collect,noGrid){
   return anim;
 }
 const LAYERS=['grasses','foliage','flowers','hero-flowers'];
+/* ---------- wind: breeze sway + strong gust that blows flowers away ---------- */
+let gust=null,WIND_LIVE=false;
+function windActive(){return P.style!=='stitch'&&(P.wind==='breeze'||!!gust)}
+const SWAY_AMP=[0.11,0.075,0.06,0.05];
+function startGust(){
+  if(P.style==='stitch'){toast('Wind is not available in Cross-stitch');return}
+  if(!plants.length){toast('Draw a path first');return}
+  let x0=1e9,x1=-1e9;for(const pl of plants){x0=Math.min(x0,pl.x);x1=Math.max(x1,pl.x)}
+  gust={t0:performance.now(),x0,span:Math.max(1,x1-x0),done:false};
+  syncUI();req();toast('Gust · press Play to grow them back');
+}
+function windPlant(pl,now){
+  const t=now/1000,r=(pl.r%1000)/1000,tier=pl.tier;
+  const wave=0.5+0.5*Math.sin(t*0.55-pl.x*0.0022);           // a slow gust front travelling left → right
+  let amp=SWAY_AMP[tier]||0.06,lean=0.05*wave;
+  let sway=Math.sin(t*(1.7+r*0.6)+r*6.3-pl.x*0.006)*amp*(0.55+0.45*wave);
+  const flies=tier>=2||(tier===1&&r<0.35);
+  if(gust&&gust.done&&flies)return null;
+  if(!gust||gust.done){if(P.wind!=='breeze')return pl;return{...pl,a:pl.a+lean+sway,bend:pl.bend+(lean+sway)*1.6}}
+  const gt=(now-gust.t0)/1000;
+  const front=((pl.x-gust.x0)/gust.span)*1.3+r*0.45;            // when the gust reaches this plant
+  const build=clamp((gt-front+0.6)/0.6,0,1)*clamp(1-(gt-front-1.2)/2.2,0,1);
+  if(!flies||gt<front){if(!flies&&P.wind!=='breeze'&&build<=0&&gt>front)return pl;const k=1+3.2*build;return{...pl,a:pl.a+(0.12*build+lean)+sway*k,bend:pl.bend+(0.12*build+sway*k)*1.8}}
+  const tau=gt-front;if(tau>4.5)return null;
+  const vx=(160+r*140),lift=(70+r*90);
+  return{...pl,x:pl.x+vx*tau+170*tau*tau,y:pl.y-lift*tau-25*tau*tau+Math.sin(tau*5+r*9)*14,a:pl.a+(0.25+r*0.5)*tau*3.2+0.3,bend:pl.bend+0.5,detached:true};
+}
 function drawScene(g,now,final){
   setDrawContext();
   let anim=false;
@@ -1762,7 +1797,8 @@ function drawScene(g,now,final){
     if(pl.tier!==cur){if(cur>=0&&g.endGroup)g.endGroup();cur=pl.tier;g.group&&g.group(LAYERS[cur])}
     let p=1;
     if(!final){p=(now-pl.birth)/650;if(p<1)anim=true;if(p<=0)continue;if(p>1)p=1}
-    g.plantStart&&g.plantStart();drawPlant(g,pl,p);g.plantEnd&&g.plantEnd();
+    let dp=pl;if(WIND_LIVE&&!final){dp=windPlant(pl,now);if(!dp)continue}
+    g.plantStart&&g.plantStart();drawPlant(g,dp,p);g.plantEnd&&g.plantEnd();
   }
   if(cur>=0&&g.endGroup)g.endGroup();
   return anim;
@@ -1783,7 +1819,10 @@ function render(now){
   const k=view.s,px=1/k;ctx.setTransform(DPR*k,0,0,DPR*k,DPR*view.x,DPR*view.y);
   if(underlay){const r=underlay.rect;ctx.save();ctx.globalAlpha=P.ulOpacity;ctx.drawImage(underlay.img,r.x,r.y,r.w,r.h);ctx.restore()}
   const vr=visRect();
+  WIND_LIVE=windActive();
   const anim=P.style==='stitch'?drawStitched(ctx,now,false,vr.x,vr.y,vr.w,vr.h):drawScene(ctx,now,false);
+  WIND_LIVE=false;
+  if(gust&&!gust.done&&(now-gust.t0)/1000>6.6){gust.done=true;syncUI()}
   const cs=getComputedStyle(document.documentElement),accent=cs.getPropertyValue('--accent').trim()||'#2F4BDB';
   const night=P.bg==='night',editing=tool==='reshape'||tool==='move';
   if((P.guide||editing)&&strokes.length){
@@ -1810,7 +1849,7 @@ function render(now){
     ctx.save();ctx.lineWidth=1.5*px;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=night?'#EDEDE6':'#151714';
     ctx.beginPath();drawing.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore();
   }
-  if(anim)req();
+  if(anim||(windActive()&&!(gust&&gust.done&&P.wind!=='breeze')))req();
 }
 
 /* ---------- UI state sync ---------- */
@@ -1825,7 +1864,7 @@ function changed(anim){regenerate();stats();positionSelbar();req();save()}
 function setPressed(sel,val){$$(sel+' button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===String(val))))}
 function syncUI(){
   setPressed('#seg-style',P.style);$('#style-blurb').textContent=STYLE_NOTES[P.style];
-  setPressed('#seg-season',P.season);setPressed('#grid-set',P.set);setPressed('#seg-palette',P.palette);setPressed('#seg-orient',P.orient);setPressed('#seg-exs',P.exs);
+  setPressed('#seg-season',P.season);setPressed('#grid-set',P.set);setPressed('#seg-palette',P.palette);setPressed('#seg-orient',P.orient);setPressed('#seg-wind',gust&&!gust.done?'gust':P.wind);{const st=P.style==='stitch';$$('#seg-wind button').forEach(b=>b.disabled=st);$('#wind-val').textContent=st?'Not in Cross-stitch':gust&&!gust.done?'Strong':P.wind==='breeze'?'Breeze':'Still'}setPressed('#seg-exs',P.exs);
   $('#set-blurb').textContent=SETS[P.set].blurb;
   $('#customs').hidden=P.palette!=='custom';
   for(const k of['density','scale','variation'])$('#r-'+k).value=P[k];
@@ -1860,6 +1899,7 @@ function seg(sel,key,cast){$$(sel+' button').forEach(b=>b.addEventListener('clic
 seg('#seg-season','season',Number);
 $$('#seg-style button').forEach(b=>b.addEventListener('click',()=>{const was=P.style;P.style=b.dataset.v;if(P.style==='photo')loadSprites();if(P.style==='metal'&&was!=='metal'&&P.bg==='paper'){P.bg='night';toast('Switched preview to the dark backdrop. Metal reads best there.')}syncUI();changed()}));seg('#grid-set','set');
 $$('#grid-set button').forEach(b=>b.addEventListener('click',()=>{if(P.style==='photo')loadSprites()}));seg('#seg-palette','palette');seg('#seg-orient','orient');
+$$('#seg-wind button').forEach(b=>b.addEventListener('click',()=>{const v=b.dataset.v;if(v==='gust'){startGust();return}P.wind=v;if(v==='still'&&gust){gust=null;regenerate()}syncUI();save();req()}));
 $$('#seg-exs button').forEach(b=>b.addEventListener('click',()=>{P.exs=Number(b.dataset.v);syncUI();save()}));
 for(const k of['density','scale','variation'])$('#r-'+k).addEventListener('input',e=>{P[k]=Number(e.target.value);syncUI();changed()});
 $('#i-seed').addEventListener('change',e=>{const v=Math.floor(Math.abs(Number(e.target.value)||0))%1000000;P.seed=v;syncUI();changed()});
@@ -2036,6 +2076,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Space'){e.preventDefault();if(!spaceDown){spaceDown=true;stage.classList.add('spacepan')}return}
   const k=e.key.toLowerCase();
   if(k==='g'){playGrowth();return}
+  if(k==='w'){if(e.shiftKey)startGust();else{P.wind=P.wind==='breeze'?'still':'breeze';syncUI();save();req()}return}
   if(k==='d'||k==='b'||k==='p')setTool('draw');
   else if(k==='v'||k==='s')setTool('select');
   else if(k==='c')setTool('reshape');

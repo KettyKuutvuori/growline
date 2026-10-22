@@ -11,6 +11,7 @@ A procedural botanical drawing tool. Draw a path and flowers, grasses, leaves an
 - Palette, density, scale, variation, orientation and seed
 - Upload an image and draw over it; select it to move, resize from the corners, or delete it
 - Play the growth animation on the canvas (G), then export it as MP4
+- Wind: a gentle breeze that sways the plants (W), or a strong gust that blows the flowers off the canvas (Shift W)
 - Export PNG, layered SVG, or the growing animation as MP4
 
 ## Run locally
